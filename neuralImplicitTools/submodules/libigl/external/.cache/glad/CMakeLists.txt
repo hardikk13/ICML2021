@@ -8,8 +8,8 @@ project(glad-download NONE)
 include(ExternalProject)
 ExternalProject_Add(glad-download
                     TLS_VERIFY;OFF;GIT_CONFIG;advice.detachedHead=false;GIT_REPOSITORY;https://github.com/libigl/libigl-glad.git;GIT_TAG;09b4969c56779f7ddf8e6176ec1873184aec890f
-                    SOURCE_DIR          "/mnt/school/shapeMemory/submodules/libigl/cmake/../external/glad"
-                    BINARY_DIR          "/mnt/school/shapeMemory/submodules/libigl/build/glad-build"
+                    SOURCE_DIR          "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/glad"
+                    BINARY_DIR          "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/build/glad-build"
                     CONFIGURE_COMMAND   ""
                     BUILD_COMMAND       ""
                     INSTALL_COMMAND     ""

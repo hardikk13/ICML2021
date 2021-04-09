@@ -3,6 +3,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) 
 set (CUDA_PROPAGATE_HOST_FLAGS ON)
+set(HighFive_DIR /home/hardik/dl_exp/overfit/cudaSDFRender/submodules/HighFive/build/)
 
 project(sdfCrap)
 add_subdirectory(src)

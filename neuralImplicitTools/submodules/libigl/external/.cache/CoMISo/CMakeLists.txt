@@ -8,8 +8,8 @@ project(CoMISo-download NONE)
 include(ExternalProject)
 ExternalProject_Add(CoMISo-download
                     TLS_VERIFY;OFF;GIT_CONFIG;advice.detachedHead=false;GIT_REPOSITORY;https://github.com/libigl/CoMISo.git;GIT_TAG;1f9618cf9b7bd77370d817976470d59091928606
-                    SOURCE_DIR          "/mnt/school/shapeMemory/submodules/libigl/cmake/../external/CoMISo"
-                    BINARY_DIR          "/mnt/school/shapeMemory/submodules/libigl/build/CoMISo-build"
+                    SOURCE_DIR          "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/CoMISo"
+                    BINARY_DIR          "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/build/CoMISo-build"
                     CONFIGURE_COMMAND   ""
                     BUILD_COMMAND       ""
                     INSTALL_COMMAND     ""

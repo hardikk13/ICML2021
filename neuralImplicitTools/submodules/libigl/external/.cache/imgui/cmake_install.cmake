@@ -1,4 +1,4 @@
-# Install script for directory: /mnt/school/shapeMemory/submodules/libigl/external/.cache/imgui
+# Install script for directory: /home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/imgui
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/mnt/school/shapeMemory/submodules/libigl/external/.cache/imgui/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/imgui/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

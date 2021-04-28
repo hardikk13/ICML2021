@@ -17,12 +17,16 @@ import argparse
 from tqdm import tqdm
 
 import h5py
+import time
+
 
 def createSequences(sdf, grid, pointSampler, batchSize, epochLength=10**6, reuseEpoch=True, useSphericalCoordinates=False):
   if reuseEpoch:
     # We just precompute one epoch and reuse each time!
     queryPts = pointSampler.sample(epochLength)
+    print("[INFO] starting sdf queries")
     S = sdf.query(queryPts)
+    print("[INFO] done sdf queries")
 
     trainData = np.concatenate((queryPts,S), axis = 1)
 
@@ -43,7 +47,9 @@ def createSequences(sdf, grid, pointSampler, batchSize, epochLength=10**6, reuse
   if grid is None:
     evalSDF = None
   else:
+    print("[INFO] starting sdf queries for evalSDF")
     gridS = sdf.query(grid)
+    print("[INFO] done sdf queries for evalSDF")
     validationData = np.concatenate((grid,gridS), axis = 1)
 
     # fixed grid sequence
@@ -83,8 +89,9 @@ def singleModelTrain(
 
     # create data sequences
     validationGrid = cubeMarcher.createGrid(config.validationRes) if config.validationRes > 0 else None
+    print("[INFO], created validation grid")
     sdfTrain, sdfEval = createSequences(sdf, validationGrid, pointSampler, config.batchSize, config.epochLength)
-
+    print("[INFO], here hardik after creating sequences")
   elif (not precomputedFn is None) :
     # precomputed!
     if 'h5' in precomputedFn:
@@ -109,7 +116,7 @@ def singleModelTrain(
 
     trainData = precomputedData['train']
     validationData = precomputedData['validation'] if 'validation' in precomputedData else None
-
+    
     sdfTrain = SDFSequence(
       trainData,
       None,
@@ -130,8 +137,9 @@ def singleModelTrain(
 
 
   # create model
+  print("[INFO] Initiate the model...")
   sdfModel = model.SDFModel(config)
-
+  print("[INFO] Starting to train the model...")
   # train the model
   sdfModel.train(
     trainGenerator = sdfTrain,
@@ -145,7 +153,7 @@ def singleModelTrain(
     S = sdfModel.predict(rGrid)
 
     # plot results
-    sdfModel.plotTrainResults()
+    # sdfModel.plotTrainResults()
 
     cubeMarcher.march(rGrid,S)
     marchedMesh = cubeMarcher.getMesh() 
@@ -169,7 +177,7 @@ def parseArgs():
   parser.add_argument('--showVis', type=int, default=False, help='0 to disable vis for headless')
   parser.add_argument('--epochs', type=int, help='epochs to run training job(s) for', default= 100)
   parser.add_argument('--epochLengthPow', type=int, default=6, help='10**epochLengthPow')
-  parser.add_argument('--learningRate', type=float, default= 0.001, help='starting lr for training')
+  parser.add_argument('--learningRate', type=float, default= 0.0001, help='starting lr for training')
   parser.add_argument('--loss', type=str, default='l1')
   parser.add_argument('--batchSize', type=int, default=2048,help='batch size for training')
   parser.add_argument('--activation', default='relu', type=str)
@@ -190,13 +198,14 @@ def isMesh(fn):
       
 if __name__ == "__main__":
   args = parseArgs()
-
+  start = time.time()
   tfConfig = tf.compat.v1.ConfigProto()
   os.environ["CUDA_VISIBLE_DEVICES"]="{}".format(args.gpu)  
   tfConfig.gpu_options.allow_growth = True
   sess = tf.compat.v1.Session(config=tfConfig)
-  tf.compat.v1.keras.backend.set_session(sess)  
-
+  tf.compat.v1.keras.backend.set_session(sess)
+  tf.config.list_physical_devices('GPU')
+  assert(tf.test.is_gpu_available())
   assert(os.path.exists(args.inputPath))
   inputPath = args.inputPath
 
@@ -247,7 +256,12 @@ if __name__ == "__main__":
     
   for dataFile in files:
     config.name = os.path.splitext(os.path.basename(dataFile))[0] + args.suffix
-
+    print("config_name:", config.name)
+    model_file = os.path.join(config.saveDir, config.name) + ".h5"
+    print("model_file:", model_file)
+    # if os.path.exists(model_file):
+    #   continue    
+    print("Training on the model:", dataFile)
     # train model on single mesh given
     singleModelTrain(
       meshFn = dataFile if isMesh(dataFile) else None,
@@ -255,3 +269,8 @@ if __name__ == "__main__":
       config = config,
       showVis = args.showVis
     )
+
+  done = time.time()
+  elapsed = done - start
+  print("[INFO] time taken:")
+  print(elapsed)

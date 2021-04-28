@@ -235,8 +235,14 @@ float sceneSDF(float3 p, float nSDF) {
     //return sdfOpSmoothSubtraction(sdfCylinder(boxp,boxb), tanh(nSDF), 0.05);//, nSDF);
 
     //return sdfOpBlend(sdfBox(p,boxb), tanh(nSDF), abs(sin(c_frameNumber*M_PI/360)));
-
-    return tanh(nSDF);
+    // TODO(hardik) :: add an intersection w/ gyroid and then take tanh.?
+    float gyroid = (cos(M_PI*p.x) * sin(M_PI * p.y) + 
+                    cos(M_PI * p.y) * sin(M_PI * p.z) + 
+                    cos(M_PI * p.z) * sin(M_PI * p.x));
+    gyroid *= gyroid;
+    gyroid -= 0.3*0.3;
+    return gyroid;
+    // return std::max(gyroid, tanh(nSDF));
 }
 
 // transform vector by matrix (no translation)
@@ -713,8 +719,8 @@ void copyViewMatrices(float *invViewMatrix, size_t sizeofViewMatrix, float *norm
 
 extern "C"
 void copyStaticSettings(int colorType, int numInputs) {
-    checkCudaErrors(cudaMemcpyToSymbol(c_coloringType, &colorType, sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(c_numInputs, &numInputs, sizeof(int)));
+    // checkCudaErrors(cudaMemcpyToSymbol(c_coloringType, &colorType, sizeof(int)));
+    // checkCudaErrors(cudaMemcpyToSymbol(c_numInputs, &numInputs, sizeof(int)));
 }
 
 

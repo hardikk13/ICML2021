@@ -13,7 +13,6 @@ tf.compat.v1.disable_eager_execution()
 
 class Config(object):
     """Holds model hyperparams and data information.
-
     The config class is used to store various hyperparameters and dataset
     information parameters. Model objects are passed a Config() object at
     instantiation.
@@ -21,7 +20,7 @@ class Config(object):
     hiddenSize = 32
     batchSize = 2048
     numLayers = 8
-    activation = 'elu'
+    activation = 'relu'
     workers = 4
     saveDir = ''
     name = 'sdfModel'
@@ -82,6 +81,7 @@ class SDFModel:
       metrics = self.modelMetrics()
     )
     self.model.summary()
+    exit(1)
 
   def modelMetrics(self):
     def max_pred(labels, predictions):
@@ -224,7 +224,11 @@ class SDFModel:
     #load weights
     self.model.load_weights(os.path.join(modelFolder,self.config.name + '.h5'))
 
+  # def gyroid(self, data):
+  #   cos(pi*data[])
+
   def predict(self, data):
+    # return max(self.model.gyroid(data), self.model.predict(data, batch_size = self.config.batchSize, verbose=1))
     return self.model.predict(data, batch_size = self.config.batchSize, verbose=1)
 
   def _clampLoss(self,yTrue, yPred):
@@ -270,6 +274,3 @@ class SDFModel:
 
   def createOpt(self):
     self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.config.learningRate)
-
-
-

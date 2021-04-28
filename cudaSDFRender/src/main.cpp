@@ -497,7 +497,9 @@ void initGL(int *argc, char **argv)
 
 
 void startRendering(int argc, char** argv) {
+    std::cout << "Init GL: " << std::endl;
     initGL(&argc, argv);
+    std::cout << "Finding Cuda device " << std::endl;
 
     findCudaDevice(argc, (const char **)argv);
 
@@ -660,7 +662,7 @@ main(int argc, char **argv)
     gridSize = dim3(iDivUp(width, blockSize.x), iDivUp(height, blockSize.y));
 
     sdkCreateTimer(&timer);
-    if (singleImage) {
+    if (1) {
         generateSingleImage();
         exit(0);
     }

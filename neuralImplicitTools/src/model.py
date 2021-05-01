@@ -81,7 +81,6 @@ class SDFModel:
       metrics = self.modelMetrics()
     )
     self.model.summary()
-    exit(1)
 
   def modelMetrics(self):
     def max_pred(labels, predictions):

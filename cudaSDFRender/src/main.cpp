@@ -402,19 +402,22 @@ int countDigit(int n) {
     return count;
 }
 
-void generateSingleImage()
+void generateSingleImage(int img_count = 0)
 {   
     uint *d_output;
+    printf("here");
     checkCudaErrors(cudaMalloc((void **)&d_output, width*height*sizeof(uint)));
+    printf("here2");
     checkCudaErrors(cudaMemset(d_output, 0, width*height*sizeof(uint)));
-
+    printf("here3");
     updateViewMatrices();
-
+    printf("here4");
     copyViewMatrices(transposedModelView.data(), sizeof(float4)*3, normalMatrix.data(), sizeof(float4)*4, frameNumber);
-
+    printf("here5");
     cudaDeviceSynchronize();
+    printf("here6");
     sdkStartTimer(&timer);
-
+    printf("here7");
     // call CUDA kernel, writing results to PBO
     render_kernel(
         gridSize, 
@@ -426,7 +429,7 @@ void generateSingleImage()
         nn,
         matcap
     );
-    
+    printf("here8");
     checkCudaErrors(cudaDeviceSynchronize());
     getLastCudaError("Error: render_kernel() execution FAILED");
     sdkStopTimer(&timer);
@@ -443,20 +446,26 @@ void generateSingleImage()
 
     checkCudaErrors(cudaMemcpy(outputImage.hostData.get(), d_output, width*height*4, cudaMemcpyDeviceToHost));
 
+
+
     std::string ext;
     //NOTE: this currently assumes max of 999 frames saved.
-    if (!singleImage) {
-        if (countDigit(saveCount) < 2) {
-            ext += "00";
-        }
-        else if (countDigit(saveCount) == 2) {
-            ext += "0";
-        }
-        ext += std::to_string(saveCount) + ".png";
+    // if (!singleImage) {
+    //     if (countDigit(saveCount) < 2) {
+    //         ext += "00";
+    //     }
+    //     else if (countDigit(saveCount) == 2) {
+    //         ext += "0";
+    //     }
+    //     ext += std::to_string(saveCount) + ".png";
+    // } else {
+    std::string base_filename = neuralGeometryPath.substr(neuralGeometryPath.find_last_of("/\\") + 1);
+    if (img_count) {
+        ext = base_filename + std::to_string(img_count) + ".png";
     } else {
-        std::string base_filename = neuralGeometryPath.substr(neuralGeometryPath.find_last_of("/\\") + 1);
         ext = base_filename + ".png";
     }
+    // }
 
     std::cout << "saving frame: " << renderSavePath + ext << std::endl;
     bool ok = outputImage.savePNG(renderSavePath + ext);
@@ -475,7 +484,7 @@ void doABarrelRoll(){
         viewRotation.y = float(i);
         frameNumber = i;
         saveCount = i;
-        generateSingleImage();
+        generateSingleImage(i+1);
     }
 }
 
@@ -662,11 +671,11 @@ main(int argc, char **argv)
     gridSize = dim3(iDivUp(width, blockSize.x), iDivUp(height, blockSize.y));
 
     sdkCreateTimer(&timer);
-    if (1) {
+    if (false) {
         generateSingleImage();
         exit(0);
     }
-    else if (doSpin) {
+    else if (true) {
         doABarrelRoll();
     }
     else {

@@ -172,7 +172,9 @@ class ImportanceSampler():
             self.sdf = None
 
     def _subsample(self, s, N):
-
+        print("[INFO], shape of samples", np.shape(s))
+        print("[INFO], self.M: ", self.M)
+        print("[INFO], # of subsamples", N)
         # weighted by exp distance to surface
         w = np.exp(-self.W*np.abs(s))
         # probabilities to choose each
@@ -202,6 +204,7 @@ class ImportanceSampler():
 
         R = np.random.choice(len(U), int(N*0.1))
         S = U[I,:]#np.concatenate((U[I,:],U[R, :]), axis=0)
+        print("[INFO]: output of importance sample:", np.shape(S))
         return S
 
     ''' sampling against a supplied U set, where s is sdf at each U'''
@@ -225,10 +228,10 @@ class SDF():
             if doPrecompute:
                 self._tree = igl.AABB()
                 self._fwn_bvh = igl.FastWindingNumberBVH()
-                print("[INFO] Precomuting bvh trees...")
+                # print("[INFO] Precomuting bvh trees...")
                 self._tree.init(self._V,self._F)
                 igl.fast_winding_number(self._V,self._F,2,self._fwn_bvh)
-                print("[INFO] Done precomputing")
+                # print("[INFO] Done precomputing")
                 self._precomputed = True
         elif signType == 'pseudonormal':
             self._signType = igl.SIGNED_DISTANCE_TYPE_PSEUDONORMAL
@@ -324,7 +327,7 @@ class Mesh():
                 ]
             )
         )
-
+        print("[INFO] scaled down by", scale)
         Vscale = T.matrix().block(0,0,3,3).transpose()
         Vtrans = igl.eigen.MatrixXd(self._V.rows(), self._V.cols())
         Vtrans.rowwiseSet(T.matrix().block(0,3,3,1).transpose())
@@ -540,10 +543,6 @@ if __name__ == '__main__':
         #importanceSamplingComparisonPlot(mesh, sdf)
         #beforeAndAfterPlot(mesh,sdf)
         #importanceMotivationPlot(mesh,sdf)
-
-
-
-
     
     main()
 

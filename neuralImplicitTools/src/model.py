@@ -210,7 +210,8 @@ class SDFModel:
     with open(os.path.join(self.config.saveDir,self.config.name + '.json'), 'w') as jsonFile:
       jsonFile.write(modelJson)
     #save weights
-    self.model.save_weights(os.path.join(self.config.saveDir,self.config.name + '.h5'))
+    self.model.save_weights(os.path.join(self.config.saveDir,self.config.name + '.h5'), save_format='h5')
+    # self.model.save(os.path.join(self.config.saveDir,self.config.name + '_builtin_.h5'))
   
   def load(self, modelFolder = None):
     if modelFolder == None:
@@ -229,6 +230,13 @@ class SDFModel:
   def predict(self, data):
     # return max(self.model.gyroid(data), self.model.predict(data, batch_size = self.config.batchSize, verbose=1))
     return self.model.predict(data, batch_size = self.config.batchSize, verbose=1)
+
+  def gradients(self, data):
+    x_tensor = tf.convert_to_tensor(data, dtype=tf.float32)
+    with tf.GradientTape() as t:
+      t.watch(x_tensor)
+      output = self.model(x_tensor)
+    return t.gradient(output, x_tensor)
 
   def _clampLoss(self,yTrue, yPred):
     return tf.keras.losses.mean_absolute_error(

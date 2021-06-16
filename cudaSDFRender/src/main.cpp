@@ -61,7 +61,7 @@ bool doSaveNextFrame = false;
 
 //////////////////////////////////////////////
 
-dim3 blockSize(8, 8);
+dim3 blockSize(32, 32);
 dim3 gridSize;
 
 float3 viewRotation;
@@ -208,8 +208,8 @@ void updateViewMatrices() {
     Eigen::Affine3f modelView = Eigen::Affine3f::Identity();
 
     Eigen::Matrix3f m;
-    m = Eigen::AngleAxisf(-viewRotation.x*M_PI/180, Eigen::Vector3f::UnitX())
-        * Eigen::AngleAxisf(-viewRotation.y*M_PI/180,  Eigen::Vector3f::UnitY());
+    m = Eigen::AngleAxisf(-viewRotation.x*M_PI/180., Eigen::Vector3f::UnitX())
+        * Eigen::AngleAxisf(-viewRotation.y*M_PI/180.,  Eigen::Vector3f::UnitY());
 
     modelView.rotate(m);
     modelView.translate(Eigen::Vector3f(-viewTranslation.x, -viewTranslation.y, -viewTranslation.z));
@@ -405,19 +405,12 @@ int countDigit(int n) {
 void generateSingleImage(int img_count = 0)
 {   
     uint *d_output;
-    printf("here");
     checkCudaErrors(cudaMalloc((void **)&d_output, width*height*sizeof(uint)));
-    printf("here2");
     checkCudaErrors(cudaMemset(d_output, 0, width*height*sizeof(uint)));
-    printf("here3");
     updateViewMatrices();
-    printf("here4");
     copyViewMatrices(transposedModelView.data(), sizeof(float4)*3, normalMatrix.data(), sizeof(float4)*4, frameNumber);
-    printf("here5");
     cudaDeviceSynchronize();
-    printf("here6");
     sdkStartTimer(&timer);
-    printf("here7");
     // call CUDA kernel, writing results to PBO
     render_kernel(
         gridSize, 
@@ -429,7 +422,6 @@ void generateSingleImage(int img_count = 0)
         nn,
         matcap
     );
-    printf("here8");
     checkCudaErrors(cudaDeviceSynchronize());
     getLastCudaError("Error: render_kernel() execution FAILED");
     sdkStopTimer(&timer);
@@ -446,42 +438,34 @@ void generateSingleImage(int img_count = 0)
 
     checkCudaErrors(cudaMemcpy(outputImage.hostData.get(), d_output, width*height*4, cudaMemcpyDeviceToHost));
 
-
-
     std::string ext;
     //NOTE: this currently assumes max of 999 frames saved.
-    // if (!singleImage) {
-    //     if (countDigit(saveCount) < 2) {
-    //         ext += "00";
-    //     }
-    //     else if (countDigit(saveCount) == 2) {
-    //         ext += "0";
-    //     }
-    //     ext += std::to_string(saveCount) + ".png";
-    // } else {
-    std::string base_filename = neuralGeometryPath.substr(neuralGeometryPath.find_last_of("/\\") + 1);
-    if (img_count) {
-        ext = base_filename + std::to_string(img_count) + ".png";
+    if (!singleImage) {
+        if (countDigit(saveCount) < 2) {
+            ext += "00";
+        }
+        else if (countDigit(saveCount) == 2) {
+            ext += "0";
+        }
+        ext += std::to_string(saveCount) + ".png";
     } else {
-        ext = base_filename + ".png";
-    }
+    // std::string base_filename = neuralGeometryPath.substr(neuralGeometryPath.find_last_of("/\\") + 1);
+    // if (img_count) {
+    //     ext = base_filename + "__00" + std::to_string(img_count) + ".png";
+    // } else {
+    //     ext = base_filename + ".png";
     // }
-
+    }
     std::cout << "saving frame: " << renderSavePath + ext << std::endl;
     bool ok = outputImage.savePNG(renderSavePath + ext);
-    
-    saveCount ++;
-    
+    saveCount++;    
     cudaFree(d_output);
-
     cleanup();
 }
 
 void doABarrelRoll(){
-    
-    
     for (int i = 0; i < 360; i ++) {
-        viewRotation.y = float(i);
+        viewRotation.y = float(i + 90.);
         frameNumber = i;
         saveCount = i;
         generateSingleImage(i+1);
@@ -644,20 +628,16 @@ main(int argc, char **argv)
 {
     pArgc = &argc;
     pArgv = argv;
-
 #if defined(__linux__)
     setenv ("DISPLAY", ":0", 0);
 #endif
-
     parseCmdOptions(argc, argv);
-
     bool ok = nn.load(neuralGeometryPath);    
     if (!ok) {
         printf("Failed to initialize model (%s)... exiting \n", neuralGeometryPath.c_str());
         return 0;
     }   
     printf("Model initialized...\n\n");
-
     if (!matcapPath.empty()) {
         ok = matcap.loadPNG(matcapPath);
         if (!ok) {
@@ -666,16 +646,18 @@ main(int argc, char **argv)
         }
         colorType = 1;
     }
-
     copyStaticSettings(colorType, numInputs);
     gridSize = dim3(iDivUp(width, blockSize.x), iDivUp(height, blockSize.y));
-
+    printf("# of grids x :%u", gridSize.x);
+    printf("and # of grids y :%u \n", gridSize.y);
+    printf("# of block x :%u", blockSize.x);
+    printf("and # of block y :%u \n", blockSize.y);    
     sdkCreateTimer(&timer);
-    if (false) {
+    if (true) {
         generateSingleImage();
         exit(0);
     }
-    else if (true) {
+    else if (false) {
         doABarrelRoll();
     }
     else {

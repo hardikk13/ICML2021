@@ -18,8 +18,9 @@ from tqdm import tqdm
 
 import h5py
 import time
+import tensorflow_model_optimization as tfmot
 
-
+# python trainer.py ../data/vicis/vicis.stl --firstLayerHiddenSize=256 --numLayers=8 --showVis 1 --outputDir ../results/vicis/ --epochs 50 --batchSize 4096 --reconstructionRes 128
 def createSequences(sdf, grid, pointSampler, batchSize, epochLength=10**6, reuseEpoch=True, useSphericalCoordinates=False):
   if reuseEpoch:
     # We just precompute one epoch and reuse each time!
@@ -146,6 +147,16 @@ def singleModelTrain(
     validationGenerator = sdfEval,
     epochs = config.epochs
   )
+
+  # prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
+  # # Define model for pruning.
+  # pruning_params = {
+  #       'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(initial_sparsity=0.50,
+  #                                                               final_sparsity=0.80,
+  #                                                               begin_step=0,
+  #                                                               end_step=end_step)
+  # }
+
 
   if showVis:
     # predict against grid

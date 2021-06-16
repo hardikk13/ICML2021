@@ -55,10 +55,10 @@ struct Sphere
 };
 
 const uint BACKGROUND_COLOR = 0;
-const int COLOR_MASK_VAL = 4;
+const int COLOR_MASK_VAL =4;
 const float NORMAL_EPSILON = 0.0001;
 const float MARCHING_EPSILON = 0.000001;
-const int MAX_STEPS = 6000;
+const int MAX_STEPS = 200;
 
 // SDF KERNELS AND HELPERS! 
 // Collection of signed distance operations and primitives.
@@ -103,9 +103,7 @@ float sdfCylinder( float3 p, float3 c) {
 __device__ 
 float sdfOpDisplace(float3 p, float s) {
     float d = s;
-
     d += sin(18*p.x)*sin(18*p.y)*sin(18*p.z)*0.06;
-
     return d;
 }
 
@@ -122,7 +120,9 @@ float sdfOpOnion(float s, float thickness) {
 // some useful SDF helpers.
 __device__
 float sdfOpIntersect(float distA, float distB) {
-    return max(distA, distB);
+    // return max(distA, distB);
+    const float h = clamp( 0.5f - 0.5f * (distB - distA) / 0.25f, 0.0f, 1.0f );
+    return max(distB, distA) + h * h * 0.25f / 0.25f;
 }
 
 __device__
@@ -221,7 +221,6 @@ bool intersectSphere(Ray ray, Sphere sphere, float *tnear, float *tfar)
 
 __device__ 
 float sceneSDF(float3 p, float nSDF) {
-
     //return displacementPattern(p, tanh(nSDF));
     //return sdfSphere(p, 0.9);
     //return sdfOpRound(tanh(nSDF),0.04);
@@ -229,13 +228,23 @@ float sceneSDF(float3 p, float nSDF) {
     //return manyCylinderCut(p, nSDF);
     //float3 boxp = make_float3(p.x+0.5, p.y+0.3, p.z-0.4);
     //float3 boxb = make_float3(0.1,0.1,0.1);
-
     //return sdfOpSmoothUnion(sdfBox(boxp,boxb,0.01), tanh(nSDF), 0.02);
-
     //return sdfOpSmoothSubtraction(sdfCylinder(boxp,boxb), tanh(nSDF), 0.05);//, nSDF);
-
     //return sdfOpBlend(sdfBox(p,boxb), tanh(nSDF), abs(sin(c_frameNumber*M_PI/360)));
-
+    // TODO(hardik) :: add an intersection w/ gyroid and then take tanh.?
+    // kCellSize = 0.125/2.  # you can change this if you want
+    // t = 0.6  # the isovalue, change if you want
+    // result = (np.cos(2*np.pi*x/kCellSize) * np.sin(2*np.pi*y/kCellSize) + \
+    //          np.cos(2*np.pi*y/kCellSize) * np.sin(2*np.pi*z/kCellSize) + \
+    //          np.cos(2*np.pi*z/kCellSize) * np.sin(2*np.pi*x/kCellSize)) - t**2
+    // const float cell_size = 0.1f;
+    // const float gyroid = (cos(2.f * M_PI * p.x / cell_size) * sin(2.f * M_PI * p.y / cell_size) + 
+    //                       cos(2.f * M_PI * p.y / cell_size) * sin(2.f * M_PI * p.z / cell_size) + 
+    //                       cos(2.f * M_PI * p.z / cell_size) * sin(2.f * M_PI * p.x / cell_size))
+    //                       - 0.5f;
+    // return displacementPattern(p, sdfOpIntersect(gyroid, tanh(nSDF)));
+    // return sdfOpIntersect(gyroid, tanh(nSDF));
+    // return sdfOpOnion(tanh(nSDF), 0.1f);
     return tanh(nSDF);
 }
 
@@ -485,27 +494,34 @@ singleMarch(
 }
 
 // simple function for debugging 
-void printCrap(Image& idSDFMap, Image& stepMask, Matrix& points, Matrix& batch) {
+void printCrap(Image& idSDFMap, Image& stepMask, Matrix& points, Matrix& batch, Matrix& sdf) {
     idSDFMap.copyDeviceToHost();
     stepMask.copyDeviceToHost();
     points.copyDeviceToHost();
     batch.copyDeviceToHost();
+    sdf.copyDeviceToHost();
 
     for (int i = 0; i < idSDFMap.size(); i ++) {
         int ptIdx = idSDFMap[i];
 
-        if (stepMask[i] > 0) {
-            printf("%d-%d:%d:  (%f,%f,%f)&(%f,%f%f)", i, stepMask[i], idSDFMap[i], points[i*3], points[i*3 + 1], points[i*3 + 2],batch[ptIdx*3], batch[ptIdx*3 + 1], batch[ptIdx*3 + 2]);
+        if (stepMask[i] > 0 && tanh(sdf[ptIdx]) < 1e-6) {
+            printf("%d-%d:%d:  (%f,%f,%f)&(%f,%f%f), sdf %f", 
+                    i, stepMask[i], idSDFMap[i], 
+                    points[i*3], points[i*3 + 1], points[i*3 + 2],
+                    batch[ptIdx*3], batch[ptIdx*3 + 1], batch[ptIdx*3 + 2], 
+                    tanh(sdf[ptIdx]));
             if (stepMask[i] >= COLOR_MASK_VAL) {
-                printf(" <---");
+                printf(" <---");                
             }
             printf("\n");
         }
     }
     printf("BATCH: \n");
-    for (int i = 0; i < batch.size()-2; i += 3) {
-        printf("\t %d: (%f, %f, %f) \n", i/3, batch[i],batch[i+1],batch[i+2] );
-    }
+    // for (int i = 0; i < batch.size()-2; i += 3) {
+    //     if (tanh(sdf[i  / 3]) < -1e-6 || true) {
+    //         printf("\t %d: (%f, %f, %f), %f \n", i/3, batch[i],batch[i+1],batch[i+2], tanh(sdf[i / 3]));
+    //     }
+    // }
     std::cout << "\n\n";
 }
 
@@ -530,7 +546,7 @@ void createBatch (
 
     // index of where to store points in batch
     uint batchIdx = d_idSDFMap[idx]*c_numInputs;    // if frame present. we offset 4 at a time!
-
+    // printf("idx: %d, batchIdx %d\n", idx, batchIdx);
     // set points according to mask val
     // mask val == 1 for step request (1 points inference)
     // mask val == 6 for normal request (6 points inference)
@@ -595,11 +611,13 @@ int prevImageSize = -1;
 void allocateBuffers(const int imageW, const int imageH, int numInputs) {
     int imageSize = imageW*imageH;
 
-    printf("IMAGE SIZE: %d (%d, %d)\n", imageSize, imageW, imageH);
+    printf("IMAGE SIZE: %d (%d, %d), numInputs: %d, COLOR_MASK_VAL: %d\n", 
+          imageSize, imageW, imageH, numInputs, COLOR_MASK_VAL);
 
     printf("ALLOCATING\n");
     points = Matrix(Shape(3, imageSize));
-    batch = Matrix(Shape(int(numInputs*COLOR_MASK_VAL), imageSize)); 
+    batch = Matrix(Shape(int(numInputs*COLOR_MASK_VAL), imageSize));
+    // batch = Matrix(Shape(3, imageSize));
     ray = Matrix(Shape(3, imageSize));  // TODO: both of these can easily be dynamic and indexed by idSDFMap
     far = Matrix(Shape(1, imageSize));  // TODO.
     stepMask = Image(Shape(imageW, imageH));
@@ -612,6 +630,8 @@ void allocateBuffers(const int imageW, const int imageH, int numInputs) {
     stepMask.allocateMemory();
     idSDFMap.allocateMemory();
     batch.allocateMemory();
+    printf("points -- 3, %d\t", imageSize);
+    printf("batch -- %d, %d\t", int(numInputs*COLOR_MASK_VAL), imageSize);
     printf("ALLOCATED\n");
 
     // we need to reinit the sdf buffer
@@ -659,9 +679,9 @@ void render_kernel(
         gridSize,
         blockSize
     );
-
+    cudaDeviceSynchronize();
     // march all rays simultaneossly. (so we can utilize batched gemm optimizations)
-    for (int i = 0; i < MAX_STEPS; i ++) {   
+    for (int i = 0; i < MAX_STEPS; i ++) {
         
         if (batchSize == 0) {
             //nothing to do!
@@ -671,6 +691,8 @@ void render_kernel(
         // infer all points required (this has no limit on batch size... large models with large images will exhaust memory very quickly!)
         // TODO: have a toggle to batch our batches into fixed chunks... this would allow us to infer large networks! (second param would be fixed and we chunk data!)
         sdf = nn.forward(batch, int(imageSize*COLOR_MASK_VAL));  // COLOR_MASK_VAL gives number of points required for normal estimation.
+        // printf("Size of batch %d, sdf: %d\n",batch.size(), sdf.size());
+        printCrap(idSDFMap, stepMask, points, batch, sdf);
         // take step, updating mask, points, and ray position (tfar)
         singleMarch<<<gridSize, blockSize>>>(
             d_output,

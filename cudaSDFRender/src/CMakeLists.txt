@@ -29,7 +29,7 @@ else()
   set(CUTLASS_ENABLE_TENSOR_CORE_MMA_DEFAULT ON)
 endif()
 
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -m64 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86;-rdc=true)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; --expt-relaxed-constexpr -m64 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_52,code=sm_52 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61 -gencode arch=compute_70,code=sm_70 -gencode arch=compute_75,code=sm_75 -gencode arch=compute_80,code=sm_80 -gencode arch=compute_86,code=sm_86 -gencode arch=compute_86,code=compute_86;-rdc=true)
 
 include_directories(
   layers
@@ -81,3 +81,24 @@ target_link_libraries(
   ${CUDA_LIBRARIES} 
   HighFive 
   -lcudadevrt)
+
+cuda_add_executable(
+  strut_lattice_generator
+  neuralNetwork.cpp
+  MarchingCubes.cpp
+  ply.c
+  layers/denseLayer.cu
+  neuralUtils/matrix.cu 
+  neuralUtils/shape.cu
+  neuralUtils/image.cu
+  common/lodepng.cpp
+  strut_lattice.cu)
+
+target_link_libraries(
+  strut_lattice_generator
+  ${GLUT_LIBRARIES} 
+  ${OPENGL_LIBRARIES} 
+  ${CUDA_LIBRARIES} 
+  ${CUDA_CUBLASS_LIBRARIES} 
+  ${CUDA_cudart_static_LIBRARY}
+  HighFive)

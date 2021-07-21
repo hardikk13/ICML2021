@@ -72,8 +72,8 @@ float SphericalNode(float x, float y, float z, const Point& p0, float r) {
 }
 
 __device__
-float StrutLattice(float x, float y, float z, float* strut_pts, std::uint32_t num_edges,
-                   std::uint32_t* strut_edges, float r) {
+float StrutLattice(float x, float y, float z, float* strut_pts, std::uint64_t num_edges,
+                   std::uint64_t* strut_edges, float r) {
   Point p0;
   p0.x = strut_pts[3*strut_edges[0]];
   p0.y = strut_pts[3*strut_edges[0] + 1];
@@ -83,9 +83,9 @@ float StrutLattice(float x, float y, float z, float* strut_pts, std::uint32_t nu
   p1.y = strut_pts[3*strut_edges[1] + 1];
   p1.z = strut_pts[3*strut_edges[1] + 2];
   float f = Capsule(x, y, z, p0, p1, r);
-  for (std::uint32_t i = 1; i < num_edges; ++i) {
-    const std::uint32_t idx0 = 2*i;
-    const std::uint32_t idx1 = idx0 + 1;
+  for (std::uint64_t i = 1; i < num_edges; ++i) {
+    const std::uint64_t idx0 = 2*i;
+    const std::uint64_t idx1 = idx0 + 1;
     p0.x = strut_pts[3*strut_edges[idx0]];
     p0.y = strut_pts[3*strut_edges[idx0] + 1];
     p0.z = strut_pts[3*strut_edges[idx0] + 2];
@@ -142,7 +142,7 @@ void CreateBatch(float min_x, float min_y, float min_z, float max_x,
 }
 
 __global__
-void EvaluateGrid(float* strut_pts, std::uint32_t num_edges, std::uint32_t* strut_edges, float r, float min_x,
+void EvaluateGrid(float* strut_pts, std::uint64_t num_edges, std::uint64_t* strut_edges, float r, float min_x,
                   float min_y, float min_z, float max_x, float max_y, float max_z, std::uint64_t num_pts_x,
                   std::uint64_t num_pts_y, std::uint64_t num_pts_z, const float* neural_implicit_sdf, float* results_gpu) {
   // Convert points into batch matrix
@@ -168,18 +168,18 @@ void EvaluateGrid(float* strut_pts, std::uint32_t num_edges, std::uint32_t* stru
 }
 
 void GenerateLattice(dim3 gridSize, dim3 blockSize,
-                     float* strut_pts, std::uint32_t num_edges,
-                     std::uint32_t* strut_edges, float r, float min_x, float min_y, float min_z,
+                     float* strut_pts, std::uint64_t num_edges,
+                     std::uint64_t* strut_edges, float r, float min_x, float min_y, float min_z,
                      float max_x, float max_y, float max_z, std::uint64_t num_pts_x,
                      std::uint64_t num_pts_y, std::uint64_t num_pts_z, NeuralNetwork& nn,
                      float* results_gpu) {
-  Matrix batch, sdf;
+  // Matrix batch, sdf;
   // batch = Matrix(Shape(3, num_pts_x * num_pts_y * num_pts_z));
   // batch.allocateMemory();
-  std::cout << "# of points to get sdf at: " << num_pts_x * num_pts_y * num_pts_z
-            << ", size of batch" << batch.size() << std::endl;
-  std::cout << gridSize.x << "," << gridSize.y << "," << gridSize.z << std::endl;
-  std::cout << blockSize.x << "," << blockSize.y << "," << blockSize.z << std::endl;
+  // std::cout << "# of points to get sdf at: " << num_pts_x * num_pts_y * num_pts_z
+  //           << ", size of batch" << batch.size() << std::endl;
+  // std::cout << gridSize.x << "," << gridSize.y << "," << gridSize.z << std::endl;
+  // std::cout << blockSize.x << "," << blockSize.y << "," << blockSize.z << std::endl;
   // CreateBatch<<<gridSize.x, blockSize.x>>> (
   //       min_x, min_y, min_z,
   //       max_x, max_y, max_z,
@@ -194,7 +194,8 @@ void GenerateLattice(dim3 gridSize, dim3 blockSize,
         min_x, min_y, min_z,
         max_x, max_y, max_z,
         num_pts_x, num_pts_y, num_pts_z,
-        (const float *) sdf.deviceData.get(), results_gpu);
+        nullptr, results_gpu);
+  // (const float *) sdf.deviceData.get()        
   // cudaDeviceSynchronize();        
 }
 
@@ -225,7 +226,7 @@ void Check(cudaError_t s) {
   }
 }
 
-void Triangulate(std::uint32_t num_pts_x, std::uint32_t num_pts_y, std::uint32_t num_pts_z,
+void Triangulate(std::uint64_t num_pts_x, std::uint64_t num_pts_y, std::uint64_t num_pts_z,
                  const std::string& out_path, float* grid_pts) {
   MarchingCubes mc(num_pts_x, num_pts_y, num_pts_z);
   mc.init_all() ;
@@ -260,6 +261,8 @@ int main(int argc, char** argv) {
     return 0;
   }     
   if (false) {
+    // Debugging code to ensure that the read in .h5 model produces the same results
+    // as that of nerualGeometries/src.
     Matrix test;
     test = Matrix(Shape(3, 1), false);
     test.allocateMemory();
@@ -295,27 +298,29 @@ int main(int argc, char** argv) {
   const std::string edges_path(argv[2]);
   const std::vector<float> pts = ReadFile<float>(pts_path);
   std::cout << "Read in the file: " << pts_path << std::endl;
-  const std::vector<std::uint32_t> edges = ReadFile<std::uint32_t>(edges_path);
+  const std::vector<std::uint64_t> edges = ReadFile<std::uint64_t>(edges_path);
   std::cout << "Read in the file: " << edges_path << " " << edges.size() << std::endl;
   float strut_pts[pts.size()];
-  for (std::uint32_t i = 0; i < pts.size(); ++i) {
+  for (std::uint64_t i = 0; i < pts.size(); ++i) {
     strut_pts[i] = pts[i];
   }
-  std::cout << "Strut_pts " << pts.size() << std::endl;
-  std::uint32_t strut_edges[edges.size()];
+  std::cout << "Strut_pts " << pts.size() << " and edges: " << edges.size() << std::endl;
+  // std::vector<std::uint16_t> strut_edges(edges.size());
+  // std::uint64_t strut_edges[edges.size()];
   std::cout << "strut_edges " << edges.size() << std::endl;
-  for (std::uint32_t i = 0; i < edges.size(); ++i) {
-    strut_edges[i] = edges[i];
-  }
+  // for (std::uint64_t i = 0; i < edges.size(); ++i) {
+  //   std::cout << i  << " " << edges[i] << std::endl;
+  //   strut_edges[i] = edges[i];
+  // }
   std::cout << "Done reading" << std::endl;
-  const std::uint32_t num_edges = edges.size() / 2;
+  const std::uint64_t num_edges = edges.size() / 2;
   // Copy strut points and edge data to GPU
   float* strut_pts_gpu;
-  std::uint32_t* strut_edges_gpu;
+  std::uint64_t* strut_edges_gpu;
   Check(cudaMalloc((void**)&strut_pts_gpu, pts.size()*sizeof(float)));
   Check(cudaMemcpy(strut_pts_gpu, strut_pts, pts.size()*sizeof(float), cudaMemcpyHostToDevice));
-  Check(cudaMalloc((void**)&strut_edges_gpu, edges.size()*sizeof(std::uint32_t)));
-  Check(cudaMemcpy(strut_edges_gpu, strut_edges, edges.size()*sizeof(std::uint32_t), cudaMemcpyHostToDevice));
+  Check(cudaMalloc((void**)&strut_edges_gpu, edges.size()*sizeof(std::uint64_t)));
+  Check(cudaMemcpy(strut_edges_gpu, edges.data(), edges.size()*sizeof(std::uint64_t), cudaMemcpyHostToDevice));
   // Get remaining args
   const float strut_diameter_mm = std::stof(argv[3]);
   const float bbox_min_x = std::stof(argv[4]);
@@ -330,7 +335,7 @@ int main(int argc, char** argv) {
   const std::uint64_t num_pts_z = static_cast<int>(std::ceil((bbox_max_z - bbox_min_z)/voxel_size));
   const std::uint64_t num_pts_total_uint64 = num_pts_x * num_pts_y * num_pts_z;
   assert(num_pts_total_uint64 < UINT64_MAX);
-  const std::uint32_t num_pts_total = static_cast<std::uint64_t>(num_pts_total_uint64);
+  const std::uint64_t num_pts_total = static_cast<std::uint64_t>(num_pts_total_uint64);
   // Call GPU kernel
   std::cout << "Generating strut lattice on GPU\n";
   std::cout << "Num total points to evaluate: " << num_pts_total << std::endl;
@@ -349,7 +354,7 @@ int main(int argc, char** argv) {
                   bbox_min_x, bbox_min_y, bbox_min_z, bbox_max_x,
                   bbox_max_y, bbox_max_z, num_pts_x, num_pts_y,
                   num_pts_z, nn, results_gpu);
-  // cudaDeviceSynchronize();
+  cudaDeviceSynchronize();
   // EvaluateGrid<<<num_blocks, threads_per_block>>>(strut_pts_gpu, num_edges, strut_edges_gpu, r,
   //                                                 bbox_min_x, bbox_min_y, bbox_min_z, bbox_max_x,
   //                                                 bbox_max_y, bbox_max_z, num_pts_x, num_pts_y,
@@ -358,12 +363,12 @@ int main(int argc, char** argv) {
   std::chrono::duration<float> elapsed_seconds = end - start;
   std::cout << "Time from start to end of GPU EvaluateGrid: " << elapsed_seconds.count() << "s\n";
   // Copy GPU data back to CPU
+  Check(cudaFree(strut_pts_gpu));
+  Check(cudaFree(strut_edges_gpu));
   std::cout << "Copying results back to CPU\n";
   float* results = new float[num_pts_total];
   Check(cudaMemcpy(results, results_gpu, num_pts_total*sizeof(float), cudaMemcpyDeviceToHost));
   Check(cudaFree(results_gpu));
-  Check(cudaFree(strut_pts_gpu));
-  Check(cudaFree(strut_edges_gpu));
   end = std::chrono::steady_clock::now();
   elapsed_seconds = end - start;
   std::cout << "Time from start to end of GPU portion: " << elapsed_seconds.count() << "s\n";

@@ -20,16 +20,19 @@ import h5py
 import time
 import tensorflow_model_optimization as tfmot
 
-# python trainer.py ../data/vicis/vicis.stl --firstLayerHiddenSize=256 --numLayers=8 --showVis 1 --outputDir ../results/vicis/ --epochs 50 --batchSize 4096 --reconstructionRes 128
+# python trainer.py ../data/vicis/vicis.stl --firstLayerHiddenSize=256 --numLayers=8 --showVis 1 --outputDir 
+#  ../results/vicis/ --epochs 50 --batchSize 4096 --reconstructionRes 128
+#  python trainer.py ../data/impeller/impeller.stl --firstLayerHiddenSize=256 --numLayers=8 --showVis 1 --outputDir 
+# ../results/impeller/ --epochs 15 --batchSize 4096 --reconstructionRes 128 --learningRate 0.001 --validationRes 128
 def createSequences(sdf, grid, pointSampler, batchSize, epochLength=10**6, reuseEpoch=True, useSphericalCoordinates=False):
   if reuseEpoch:
     # We just precompute one epoch and reuse each time!
-    queryPts = pointSampler.sample(epochLength)
+    queryPts = pointSampler.sample(epochLength*2)
     print("[INFO] starting sdf queries")
     S = sdf.query(queryPts)
     print("[INFO] done sdf queries")
-
     trainData = np.concatenate((queryPts,S), axis = 1)
+    # Add more training data by just sampling the surface and making the distance explicitly 0.
 
     trainSDF = SDFSequence(
       trainData,
@@ -138,6 +141,7 @@ def singleModelTrain(
 
 
   # create model
+  start_time = time.time()
   print("[INFO] Initiate the model...")
   sdfModel = model.SDFModel(config)
   print("[INFO] Starting to train the model...")
@@ -157,7 +161,8 @@ def singleModelTrain(
   #                                                               end_step=end_step)
   # }
 
-
+  end_time = time.time()
+  print("[INFO]: Time taken for initialization and training:", end_time - start_time)
   if showVis:
     # predict against grid
     rGrid = cubeMarcher.createGrid(config.reconstructionRes)
@@ -188,7 +193,7 @@ def parseArgs():
   parser.add_argument('--showVis', type=int, default=False, help='0 to disable vis for headless')
   parser.add_argument('--epochs', type=int, help='epochs to run training job(s) for', default= 100)
   parser.add_argument('--epochLengthPow', type=int, default=6, help='10**epochLengthPow')
-  parser.add_argument('--learningRate', type=float, default= 0.0001, help='starting lr for training')
+  parser.add_argument('--learningRate', type=float, default= 0.01, help='starting lr for training')
   parser.add_argument('--loss', type=str, default='l1')
   parser.add_argument('--batchSize', type=int, default=2048,help='batch size for training')
   parser.add_argument('--activation', default='relu', type=str)

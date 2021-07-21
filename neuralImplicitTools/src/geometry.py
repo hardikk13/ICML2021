@@ -199,6 +199,7 @@ class ImportanceSampler():
 
         #uniform samples
         U = self.uniformSampler.sample(self.M)
+        print("[INFO]: Performing Sampling SDF:", np.shape(U))
         s = self.sdf.query(U)
         I = self._subsample(s, N)
 
@@ -250,7 +251,7 @@ class SDF():
 
         if self._precomputed and self._signType == igl.SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER:
             # generate samples from precomputed bvh's
-            print("[INFO] Generating SDFs")
+            print("[INFO] Generating SDFs", np.shape(queries))
             igl.signed_distance_fast_winding_number(
                 queryV, 
                 self._V,
@@ -258,7 +259,10 @@ class SDF():
                 self._tree,
                 self._fwn_bvh,
                 S
-            )
+            )            
+            # S = np.where(S > 1e-2, 1, S)
+            # S = np.where(S < -1e-2, -1, S)
+            # S = np.where(np.abs(S) <= 1e-2, 0, S)
             print("[INFO] SDFs done")
         else:
             igl.signed_distance(
@@ -271,7 +275,6 @@ class SDF():
                 C,
                 N
             )
-
         return iglhelpers.e2p(S)
 
 class Mesh():

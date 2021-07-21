@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import schedules
+import yogi_opt
 
 from tensorboard.plugins.hparams import api as hp
 
@@ -100,7 +101,7 @@ class SDFModel:
     def inOut(labels,predictions):
       return 0.5*tf.math.maximum(0.0, 1 - tf.math.sign(labels) * tf.math.sign(predictions))
 
-    metrics = [mse,mae]#,mape,overshot, inOut]
+    metrics = [mse,mae,inOut]#,mape,overshot, inOut]
 
     return (metrics)
 
@@ -261,6 +262,9 @@ class SDFModel:
       )*surfaceWeight
     )
 
+  def _inOut(self, yTrue, yPred):
+    return 0.5*tf.math.maximum(0.0, 1 - tf.math.sign(yTrue) * tf.math.sign(yPred))
+
   def _weightedL1(self, yTrue, yPred):
     #hypothesis: we care less about things far from surface.
     return tf.reduce_mean(tf.abs(yTrue-yPred)*tf.math.exp(-50*tf.math.abs(yTrue)))
@@ -268,8 +272,10 @@ class SDFModel:
   def createLoss(self):
     if self.config.lossType ==  'l1':
       self.loss = tf.keras.losses.MeanAbsoluteError()
-    elif self.config.lossType == 'l2':
+    elif self.config.lossType == 'l2':      
       self.loss = tf.keras.losses.MeanSquaredError()
+    elif self.config.lossType == 'InOut':      
+      self.loss = self._inOut
     elif self.config.lossType == 'clamp':
       self.loss = self._clampLoss
     elif self.config.lossType == 'min':
@@ -281,3 +287,4 @@ class SDFModel:
 
   def createOpt(self):
     self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.config.learningRate)
+    # self.optimizer = yogi_opt.Yogi(learning_rate=self.config.learningRate)

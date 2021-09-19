@@ -58,20 +58,35 @@ class SDFModel:
 
     inputs = tf.keras.Input(shape= (3,))
 
+    # DAM shape
+    dam_dim = [333, 442, 351, 340, 304, 139, 76, 53, 39, 36, 35]
+    if self.config.damArch:
+      hiddenSize = dam_dim[0]
+    else:
+      hiddenSize = self.config.hiddenSize
+
     x = tf.keras.layers.Dense(
-      self.config.hiddenSize,
+      hiddenSize,
       input_shape=(3,),
+      kernel_initializer=self.config.init,
       activation = self.config.activation
     )(inputs)
 
-    for _ in range(self.config.numLayers - 1):
-        x = tf.keras.layers.Dense(
-          self.config.hiddenSize,
-          activation = self.config.activation
-        )(x)
+    
+    for i in range(self.config.numLayers - 1):
+      if self.config.damArch:
+        hiddenSize = dam_dim[i+1]
+      else:
+        hiddenSize = self.config.hiddenSize
+      x = tf.keras.layers.Dense(
+        hiddenSize,
+        kernel_initializer=self.config.init,
+        activation = self.config.activation
+      )(x)
     
     outputs = tf.keras.layers.Dense(
         1,
+        kernel_initializer=self.config.init,
         activation='tanh',
     )(x)
 

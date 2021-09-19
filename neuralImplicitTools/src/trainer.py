@@ -24,12 +24,17 @@ import tensorflow_model_optimization as tfmot
 #  ../results/vicis/ --epochs 50 --batchSize 4096 --reconstructionRes 128
 #  python trainer.py ../data/impeller/impeller.stl --firstLayerHiddenSize=256 --numLayers=8 --showVis 1 --outputDir 
 # ../results/impeller/ --epochs 15 --batchSize 4096 --reconstructionRes 128 --learningRate 0.001 --validationRes 128
-def createSequences(sdf, grid, pointSampler, batchSize, epochLength=10**6, reuseEpoch=True, useSphericalCoordinates=False):
+def createSequences(sdf, grid, pointSampler, batchSize, epochLength, reuseEpoch=True, useSphericalCoordinates=False, scaler=None):
   if reuseEpoch:
     # We just precompute one epoch and reuse each time!
-    queryPts = pointSampler.sample(epochLength*2)
+    queryPts = pointSampler.sample(epochLength)
     print("[INFO] starting sdf queries")
     S = sdf.query(queryPts)
+
+    # normalization
+    if scaler is not None:
+      S = scaler.fit_transform(S)
+
     print("[INFO] done sdf queries")
     trainData = np.concatenate((queryPts,S), axis = 1)
     # Add more training data by just sampling the surface and making the distance explicitly 0.
@@ -89,12 +94,32 @@ def singleModelTrain(
     elif samplingMethod['type'] == 'Importance':
       pointSampler = gm.ImportanceSampler(mesh, int(config.epochLength/samplingMethod['ratio']), samplingMethod['weight'])
     else:
-      raise("uhhhh")
+      raise("Invalid Choice of Sampling Methods. Please select from 'SurfaceUniform', 'Uniform' and 'Importance'.", )
+
+    # SDF normalization
+    if config.scaler =='None':
+      SDF_scaler = None
+    elif config.scaler =='StandardScaler':
+      from sklearn.preprocessing import StandardScaler
+      SDF_scaler = StandardScaler()
+    elif config.scaler =='PowerTransformer':
+      from sklearn.preprocessing import PowerTransformer
+      SDF_scaler = PowerTransformer()
+    elif config.scaler == 'QuantileTransformer':
+      from sklearn.preprocessing import QuantileTransformer
+      SDF_scaler = QuantileTransformer(output_distribution='normal')
+
+    if SDF_scaler is not None:
+      print("[INFO]: Normalization using %s." % config.scaler)
 
     # create data sequences
     validationGrid = cubeMarcher.createGrid(config.validationRes) if config.validationRes > 0 else None
     print("[INFO], created validation grid")
-    sdfTrain, sdfEval = createSequences(sdf, validationGrid, pointSampler, config.batchSize, config.epochLength)
+    sdfTrain, sdfEval = createSequences(sdf, validationGrid, pointSampler, config.batchSize, config.num_points, scaler=SDF_scaler)
+    if config.saveSDF:
+      print("[INFO], saving training data.")
+      np.save(os.path.join(outputDir,config.name + '.npy'), sdfTrain._sdf)
+        
     print("[INFO], here hardik after creating sequences")
   elif (not precomputedFn is None) :
     # precomputed!
@@ -137,7 +162,7 @@ def singleModelTrain(
       )
 
   else:
-    raise(ValueError("uhh I need data"))
+    raise(ValueError("Data not generated or loaded. Invalid input mesh."))
 
 
   # create model
@@ -171,6 +196,17 @@ def singleModelTrain(
     # plot results
     # sdfModel.plotTrainResults()
 
+    # Inverse Transformation for the normalization
+    
+    if config.scaler =='StandardScaler':
+      S = SDF_scaler.inverse_transform(S)
+    elif config.scaler =='PowerTransformer':
+      S = SDF_scaler._scaler.inverse_transform(S)
+    elif config.scaler =='QuantileTransformer':
+      S = SDF_scaler.inverse_transform(S)
+    if SDF_scaler is not None:
+      print("[INFO]: Inverse Normalization using %s." % config.scaler)
+
     cubeMarcher.march(rGrid,S)
     marchedMesh = cubeMarcher.getMesh() 
     marchedMesh.show()
@@ -199,11 +235,16 @@ def parseArgs():
   parser.add_argument('--activation', default='relu', type=str)
   parser.add_argument('--firstLayerHiddenSize', type=int, default=32)
   parser.add_argument('--numLayers', type=int, default=8)
-  parser.add_argument('--samplingMethod', type=str, default='Importance')
+  parser.add_argument('--samplingMethod', type=str, default='Importance', choices=['Importance', 'Surface', 'Uniform'])
   parser.add_argument('--importanceWeight', type=int, default=60)
   parser.add_argument('--suffix', type=str, default='')
   parser.add_argument('--gpu', type=int, default=0)
   parser.add_argument('--writeOutEpochs', type=int, default=0)
+  parser.add_argument('--scaler', type=str, default='None', choices=['StandardScaler', 'PowerTransformer', 'QuantileTransformer', 'None'])
+  parser.add_argument('--init', type=str, default='glorot_uniform', choices=['glorot_uniform', 'he_uniform'])
+  parser.add_argument('--num_points', type=int, default=1000000, help="Number of sample SDF points used for training.")
+  parser.add_argument('--damArch', type=int, default=False, help='Use network architecture given by DAM.')
+  parser.add_argument('--saveSDF', type=int, default=False, help='Save SDF data.')
   return parser.parse_args()
 
 def isMesh(fn):
@@ -231,7 +272,8 @@ if __name__ == "__main__":
     supportedFormats = ['off','stl', 'obj', 'npz', 'h5']
     files = [i for i in os.listdir(inputPath)]
     files = [i for i in files if i.split('.')[-1] in supportedFormats]
-    files = [os.path.join(inputPath, i) for i in files]
+    existing_file_names = [i.split('.')[0] for i in os.listdir(args.outputDir) if i.split('.')[-1] in supportedFormats]
+    files = [os.path.join(inputPath, i) for i in files if i.split('.')[0] not in existing_file_names]
 
   # default config for all experiments (specific experiments may override!)
   config = model.Config()
@@ -248,6 +290,11 @@ if __name__ == "__main__":
   config.lossType = args.loss
   config.queryPath = args.queryPath
   config.saveWeightsEveryEpoch = args.writeOutEpochs
+  config.scaler = args.scaler
+  config.init = args.init
+  config.num_points = args.num_points
+  config.damArch = args.damArch
+  config.saveSDF = args.saveSDF
 
   if (args.samplingMethod == 'Importance'):
     print("Importance Sampling!")
@@ -279,12 +326,16 @@ if __name__ == "__main__":
     #   continue    
     print("Training on the model:", dataFile)
     # train model on single mesh given
-    singleModelTrain(
-      meshFn = dataFile if isMesh(dataFile) else None,
-      precomputedFn = dataFile if not isMesh(dataFile) else None, 
-      config = config,
-      showVis = args.showVis
-    )
+    try:
+      singleModelTrain(
+        meshFn = dataFile if isMesh(dataFile) else None,
+        precomputedFn = dataFile if not isMesh(dataFile) else None, 
+        config = config,
+        showVis = args.showVis
+      )
+    except:
+      print("Processing Failed. Pass.")
+      continue
 
   done = time.time()
   elapsed = done - start

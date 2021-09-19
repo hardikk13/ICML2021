@@ -156,10 +156,11 @@ void EvaluateGrid(float* strut_pts, std::uint64_t num_edges, std::uint64_t* stru
   if (idx >= num_pts_x) return;
   if (idy >= num_pts_y) return;
   if (idz >= num_pts_z) return;
-  const float x = min_x + idx * (max_x - min_x) / (num_pts_x - 1);
-  const float y = min_y + idy * (max_y - min_y) / (num_pts_y - 1);
-  const float z = min_z + idz * (max_z - min_z) / (num_pts_z - 1);
-  results_gpu[index] = StrutLattice(x, y, z, strut_pts, num_edges, strut_edges, r);
+  // const float x = min_x + idx * (max_x - min_x) / (num_pts_x - 1);
+  // const float y = min_y + idy * (max_y - min_y) / (num_pts_y - 1);
+  // const float z = min_z + idz * (max_z - min_z) / (num_pts_z - 1);
+  results_gpu[index] = neural_implicit_sdf[index];
+  // StrutLattice(x, y, z, strut_pts, num_edges, strut_edges, r);
   // tanh(neural_implicit_sdf[index]);
   // printf("Index %ld, x=%f, y=%f, z=%f, sdf=%f\n", index, x, y, z, results_gpu[index]);
   // StrutLattice(x, y, z, strut_pts, num_edges, strut_edges, r);
@@ -173,30 +174,30 @@ void GenerateLattice(dim3 gridSize, dim3 blockSize,
                      float max_x, float max_y, float max_z, std::uint64_t num_pts_x,
                      std::uint64_t num_pts_y, std::uint64_t num_pts_z, NeuralNetwork& nn,
                      float* results_gpu) {
-  // Matrix batch, sdf;
-  // batch = Matrix(Shape(3, num_pts_x * num_pts_y * num_pts_z));
-  // batch.allocateMemory();
-  // std::cout << "# of points to get sdf at: " << num_pts_x * num_pts_y * num_pts_z
-  //           << ", size of batch" << batch.size() << std::endl;
-  // std::cout << gridSize.x << "," << gridSize.y << "," << gridSize.z << std::endl;
-  // std::cout << blockSize.x << "," << blockSize.y << "," << blockSize.z << std::endl;
-  // CreateBatch<<<gridSize.x, blockSize.x>>> (
-  //       min_x, min_y, min_z,
-  //       max_x, max_y, max_z,
-  //       num_pts_x, num_pts_y, num_pts_z,
-  //       batch.deviceData.get());  
-  // std::cout << "About to evaulate nn" << std::endl;
-  // sdf = nn.forward(batch, int(num_pts_x * num_pts_y * num_pts_z * 3));
+  Matrix batch, sdf;
+  batch = Matrix(Shape(3, num_pts_x * num_pts_y * num_pts_z));
+  batch.allocateMemory();
+  std::cout << "# of points to get sdf at: " << num_pts_x * num_pts_y * num_pts_z
+            << ", size of batch" << batch.size() << std::endl;
+  std::cout << gridSize.x << "," << gridSize.y << "," << gridSize.z << std::endl;
+  std::cout << blockSize.x << "," << blockSize.y << "," << blockSize.z << std::endl;
+  CreateBatch<<<gridSize.x, blockSize.x>>> (
+        min_x, min_y, min_z,
+        max_x, max_y, max_z,
+        num_pts_x, num_pts_y, num_pts_z,
+        batch.deviceData.get());  
+  std::cout << "About to evaulate nn" << std::endl;
+  sdf = nn.forward(batch, int(num_pts_x * num_pts_y * num_pts_z * 3));
   // PrintMatrix(batch, sdf);
-  // const float* d_sdf = sdf.deviceData.get();
+  const float* d_sdf = sdf.deviceData.get();
   EvaluateGrid<<<gridSize, blockSize>>>(
         strut_pts, num_edges, strut_edges, r,
         min_x, min_y, min_z,
         max_x, max_y, max_z,
         num_pts_x, num_pts_y, num_pts_z,
-        nullptr, results_gpu);
+        d_sdf, results_gpu);
   // (const float *) sdf.deviceData.get()        
-  // cudaDeviceSynchronize();        
+  cudaDeviceSynchronize();        
 }
 
 // File IO

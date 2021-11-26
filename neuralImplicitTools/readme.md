@@ -54,6 +54,7 @@ python trainer.py ../data/impeller/impeller.stl \
 --reconstructionRes 256
 ```
 Training time is around 70 ~ 80 seconds on K80.
+# Ran on 11/26/2021
 
 ---
 ### Low Budget Training

@@ -82,18 +82,19 @@ int NeuralNetwork::getNumBiasParams() const {
     return numBiasParams;
 }
 
-bool NeuralNetwork::load(std::string fp, bool hostOnly) { 
+bool NeuralNetwork::load(std::string fp, bool hostOnly) {
+    std::cout << "Trying to read in file: " << fp << std::endl;
     HighFive::File file(fp, HighFive::File::ReadOnly);
 
     std::vector<std::string> kerasLayers = file.listObjectNames();
     int layerCount = 0;
-
+    std::cout << "# of kerasLayers: " << kerasLayers.size() << std::endl;
     for (std::vector<std::string>::iterator it = kerasLayers.begin() ; it != kerasLayers.end(); ++it) {
         // for each layer, copy weights to eigen
         HighFive::ObjectType objType = file.getObjectType(*it);
-
+        // std::cout << "Layer name: " << *it << std::endl;
         if (objType != HighFive::ObjectType::Group) {
-            std::cout << "Unsupported Layer\n";
+            std::cout << "Unsupported Layer here\n";
             return false;
         }
 
@@ -101,8 +102,9 @@ bool NeuralNetwork::load(std::string fp, bool hostOnly) {
         int n = group.getNumberObjects();
         
         if (n != 1) {
-            std::cout << "Unsupported Layer\n";
-            return false;
+            std::cout << "Unsupported Layer, n is " << n << " instead of 1.\n";
+            // return false;
+            continue;
         }
 
         group = group.getGroup(*it);
@@ -112,9 +114,10 @@ bool NeuralNetwork::load(std::string fp, bool hostOnly) {
         std::vector<float> biases;
 
         for (std::vector<std::string>::iterator matIt = matNames.begin(); matIt != matNames.end(); ++matIt) {
+            // std::cout << "matIt: " << *matIt << std::endl;
             objType = group.getObjectType(*matIt);
             if (objType != HighFive::ObjectType::Dataset) {
-                std::cout << "Unsupported Layer\n";
+                std::cout << "Unsupported Layer here3\n";
                 return false;
             }
 
@@ -134,10 +137,11 @@ bool NeuralNetwork::load(std::string fp, bool hostOnly) {
         }
 
         int activation = ReLU; //RELU
-        if  ((it != kerasLayers.end()) && (next(it) == kerasLayers.end())) {
+        // Instead of if  ((it != kerasLayers.end()) && (next(next(it)) == kerasLayers.end()))
+        if  ((it != kerasLayers.end()) && (next(next(it)) == kerasLayers.end())) {
             activation = Tanh; 
         }
-
+        std::cout << "layer: " << layerCount << ", activation: " << activation << std::endl;
         addLayer(new DenseLayer(
             std::string("Dense_") + std::to_string(layerCount), 
             weights, 

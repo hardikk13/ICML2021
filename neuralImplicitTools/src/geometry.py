@@ -172,7 +172,9 @@ class ImportanceSampler():
             self.sdf = None
 
     def _subsample(self, s, N):
-
+        print("[INFO], shape of samples", np.shape(s))
+        print("[INFO], self.M: ", self.M)
+        print("[INFO], # of subsamples", N)
         # weighted by exp distance to surface
         w = np.exp(-self.W*np.abs(s))
         # probabilities to choose each
@@ -197,11 +199,13 @@ class ImportanceSampler():
 
         #uniform samples
         U = self.uniformSampler.sample(self.M)
+        print("[INFO]: Performing Sampling SDF:", np.shape(U))
         s = self.sdf.query(U)
         I = self._subsample(s, N)
 
         R = np.random.choice(len(U), int(N*0.1))
         S = U[I,:]#np.concatenate((U[I,:],U[R, :]), axis=0)
+        print("[INFO]: output of importance sample:", np.shape(S))
         return S
 
     ''' sampling against a supplied U set, where s is sdf at each U'''
@@ -225,10 +229,10 @@ class SDF():
             if doPrecompute:
                 self._tree = igl.AABB()
                 self._fwn_bvh = igl.FastWindingNumberBVH()
-                print("[INFO] Precomuting bvh trees...")
+                # print("[INFO] Precomuting bvh trees...")
                 self._tree.init(self._V,self._F)
                 igl.fast_winding_number(self._V,self._F,2,self._fwn_bvh)
-                print("[INFO] Done precomputing")
+                # print("[INFO] Done precomputing")
                 self._precomputed = True
         elif signType == 'pseudonormal':
             self._signType = igl.SIGNED_DISTANCE_TYPE_PSEUDONORMAL
@@ -247,6 +251,7 @@ class SDF():
 
         if self._precomputed and self._signType == igl.SIGNED_DISTANCE_TYPE_FAST_WINDING_NUMBER:
             # generate samples from precomputed bvh's
+            print("[INFO] Generating SDFs", np.shape(queries))
             igl.signed_distance_fast_winding_number(
                 queryV, 
                 self._V,
@@ -254,7 +259,11 @@ class SDF():
                 self._tree,
                 self._fwn_bvh,
                 S
-            )
+            )            
+            # S = np.where(S > 1e-2, 1, S)
+            # S = np.where(S < -1e-2, -1, S)
+            # S = np.where(np.abs(S) <= 1e-2, 0, S)
+            print("[INFO] SDFs done")
         else:
             igl.signed_distance(
                 queryV, 
@@ -266,7 +275,6 @@ class SDF():
                 C,
                 N
             )
-
         return iglhelpers.e2p(S)
 
 class Mesh():
@@ -288,6 +296,7 @@ class Mesh():
             else:
                 self._V = V
                 self._F = F
+                self._normalizeMesh()                
         else:
             self._loadMesh(meshPath,doNormalize)
 
@@ -321,14 +330,14 @@ class Mesh():
                 ]
             )
         )
-
+        print("[INFO] scaled down by", scale)
         Vscale = T.matrix().block(0,0,3,3).transpose()
         Vtrans = igl.eigen.MatrixXd(self._V.rows(), self._V.cols())
         Vtrans.rowwiseSet(T.matrix().block(0,3,3,1).transpose())
 
         self._V = (self._V*Vscale)*scale + Vtrans
 
-    def show(self, doLaunch = True):
+    def show(self, doLaunch = False):
         if self._viewer == None:
             self._viewer = igl.glfw.Viewer()
 
@@ -339,174 +348,174 @@ class Mesh():
 
     def save(self, fp):
         igl.writeOBJ(fp,self._V,self._F)
+        
+
+def normSDF(S, minVal=None,maxVal=None):
+    if minVal is None:
+        minVal = np.min(S)
+        maxVal = np.max(S)
+    
+    # we don't shift. Keep 0 at 0.
+    S = np.array([item for sublist in S for item in sublist])
+
+    #S[S<0] = -(S[S<0] / minVal)
+    #S[S>0] = (S[S>0] / maxVal)
+    #S = (S + 1)/2
+
+    S[S<0] = -0.8
+    S[S>0] = 0.8
+    
+    return S
+
+def createAx(idx):
+    subplot = pyplot.subplot(idx, projection='3d')
+    subplot.set_xlim((-1,1))
+    subplot.set_ylim((-1,1))
+    subplot.set_zlim((-1,1))
+    subplot.view_init(elev=10, azim=100)
+    subplot.axis('off')
+    subplot.dist = 8
+    return subplot
+
+def createAx2d(idx):
+    subplot = pyplot.subplot(idx)
+    subplot.set_xlim((-1,1))
+    subplot.set_ylim((-1,1))
+    subplot.axis('off')
+    return subplot
+
+def plotCube(ax):
+    # draw cube
+    r = [-1, 1]
+
+    from itertools import product, combinations
+    for s, e in combinations(np.array(list(product(r, r, r))), 2):
+        if np.sum(np.abs(s-e)) == r[1]-r[0]:
+            ax.plot3D(*zip(s, e), color="black")
+
+def density(U):
+    c = gaussian_kde(np.transpose(U))(np.transpose(U))
+    return c
+
+def plotMesh(ax, mesh, N=10000):
+    surfaceSampler = PointSampler(mesh, ratio=0.0, std=0.0)
+    surfaceSamples = surfaceSampler.sample(N)
+    x,y,z = np.hsplit(surfaceSamples,3)
+    ax.scatter(x,z,y, c='black', marker='.')
+
+def plotSamples(ax, U, c, vmin = -1, is2d = False):
+    x,y,z = np.hsplit(U,3)
+    ax.scatter(x,y,z,c=c, marker='.',cmap='coolwarm', norm=None, vmin=vmin, vmax=1)
+
+def importanceSamplingComparisonPlot(mesh,sdf):
+    fig = pyplot.figure(figsize=(30,10))
+    axUniform = createAx(131)
+    axSurface = createAx(132)
+    axImportance = createAx(133)
+
+    plotCube(axUniform)
+    plotCube(axSurface)
+    plotCube(axImportance)
+
+    
+    #plotMesh(axUniform,mesh)
+    #plotMesh(axImportance,mesh)
+    #plotMesh(axSurface,mesh)
+    
+    # plot uniform sampled 
+    uniformSampler = PointSampler(mesh, ratio = 1.0)    
+    U = uniformSampler.sample(10000)
+    SU = sdf.query(U)
+    c = normSDF(SU)
+    plotSamples(axUniform, U,c)
+
+    # plot surface + noise sampling
+    sampler = PointSampler(mesh, ratio = 0.1, std = 0.01, verticeSampling=False)
+    p = sampler.sample(10000)
+    S = sdf.query(p)
+    c = normSDF(S, np.min(SU), np.max(SU))
+    plotSamples(axSurface, p,c)
+
+    # plot importance
+    importanceSampler = ImportanceSampler(mesh, 100000, 20)
+    p = importanceSampler.sample(10000)
+    S = sdf.query(p)
+    c = normSDF(S, np.min(SU), np.max(SU))
+
+    plotSamples(axImportance, p,c)
+
+    fig.patch.set_visible(False)
+
+    pyplot.axis('off')
+    pyplot.show()
+
+def beforeAndAfterPlot(mesh,sdf):
+    fig = pyplot.figure(figsize=(10,10))
+    fig.patch.set_visible(False)
+    axBefore = createAx(111)
+    
+    pyplot.axis('off')
+    #plotCube(axBefore)
+    #plotCube(axAfter)
+
+    # plot importance
+    importanceSampler = ImportanceSampler(mesh, 100000, 20)
+    p = importanceSampler.sample(10000)
+    plotSamples(axBefore, p,'grey')
+    pyplot.savefig('before.png', dpi=300, transparent=True)
+    
+    fig = pyplot.figure(figsize=(10,10))
+    fig.patch.set_visible(False)
+    axAfter = createAx(111)
+    S = sdf.query(p)
+    c = normSDF(S)
+    plotSamples(axAfter, p,c)
+    pyplot.savefig('after.png', dpi=300, transparent=True)
+
+
+def importanceMotivationPlot(mesh,sdf):
+
+    fig = pyplot.figure(figsize=(10,10))
+    axSurface = createAx(111)
+
+    #surface sampling
+    sampler = PointSampler(mesh, ratio = 0.0, std = 0.01, verticeSampling=False)
+    p = sampler.sample(10000)
+    c = density(p)
+    maxDensity = np.max(c)
+    c = c/maxDensity
+    plotSamples(axSurface, p,c, vmin=0)
+    #pyplot.show()
+    pyplot.savefig('surface.png', dpi=300, transparent=True)
+
+
+    #vertex sampling
+    fig = pyplot.figure(figsize=(10,10))
+    axVertex = createAx(111)
+    sampler = PointSampler(mesh, ratio = 0.0, std = 0.1, verticeSampling=True)
+    p = sampler.sample(10000)
+    c = density(p)
+    maxDensity = np.max(c)
+    c = c/maxDensity
+    plotSamples(axVertex, p,c, vmin=0)
+    #pyplot.show()
+    pyplot.savefig('vertex.png', dpi=300, transparent=True)
+
+    fig = pyplot.figure(figsize=(10,10))
+    axImportance = createAx(111)
+    
+    # importance sampling
+    importanceSampler = ImportanceSampler(mesh, 1000000, 50)
+    p = importanceSampler.sample(10000)
+    c = density(p)
+    maxDensity = np.max(c)
+    c = c/maxDensity
+    plotSamples(axImportance, p, c, vmin = 0)
+    #pyplot.show()
+    pyplot.savefig('importance.png', dpi=300, transparent=True)
+
 
 if __name__ == '__main__':
-    def normSDF(S, minVal=None,maxVal=None):
-        if minVal is None:
-            minVal = np.min(S)
-            maxVal = np.max(S)
-        
-        # we don't shift. Keep 0 at 0.
-        S = np.array([item for sublist in S for item in sublist])
-
-        #S[S<0] = -(S[S<0] / minVal)
-        #S[S>0] = (S[S>0] / maxVal)
-        #S = (S + 1)/2
-
-        S[S<0] = -0.8
-        S[S>0] = 0.8
-        
-        return S
-
-    def createAx(idx):
-        subplot = pyplot.subplot(idx, projection='3d')
-        subplot.set_xlim((-1,1))
-        subplot.set_ylim((-1,1))
-        subplot.set_zlim((-1,1))
-        subplot.view_init(elev=10, azim=100)
-        subplot.axis('off')
-        subplot.dist = 8
-        return subplot
-
-    def createAx2d(idx):
-        subplot = pyplot.subplot(idx)
-        subplot.set_xlim((-1,1))
-        subplot.set_ylim((-1,1))
-        subplot.axis('off')
-        return subplot
-
-    def plotCube(ax):
-        # draw cube
-        r = [-1, 1]
-
-        from itertools import product, combinations
-        for s, e in combinations(np.array(list(product(r, r, r))), 2):
-            if np.sum(np.abs(s-e)) == r[1]-r[0]:
-                ax.plot3D(*zip(s, e), color="black")
-
-    def density(U):
-        c = gaussian_kde(np.transpose(U))(np.transpose(U))
-        return c
-
-    def plotMesh(ax, mesh, N=10000):
-        surfaceSampler = PointSampler(mesh, ratio=0.0, std=0.0)
-        surfaceSamples = surfaceSampler.sample(N)
-        x,y,z = np.hsplit(surfaceSamples,3)
-        ax.scatter(x,z,y, c='black', marker='.')
-
-    def plotSamples(ax, U, c, vmin = -1, is2d = False):
-        x,y,z = np.hsplit(U,3)
-        ax.scatter(x,y,z,c=c, marker='.',cmap='coolwarm', norm=None, vmin=vmin, vmax=1)
-
-    def importanceSamplingComparisonPlot(mesh,sdf):
-        fig = pyplot.figure(figsize=(30,10))
-        axUniform = createAx(131)
-        axSurface = createAx(132)
-        axImportance = createAx(133)
-
-        plotCube(axUniform)
-        plotCube(axSurface)
-        plotCube(axImportance)
-
-        
-        #plotMesh(axUniform,mesh)
-        #plotMesh(axImportance,mesh)
-        #plotMesh(axSurface,mesh)
-        
-        # plot uniform sampled 
-        uniformSampler = PointSampler(mesh, ratio = 1.0)    
-        U = uniformSampler.sample(10000)
-        SU = sdf.query(U)
-        c = normSDF(SU)
-        plotSamples(axUniform, U,c)
-
-        # plot surface + noise sampling
-        sampler = PointSampler(mesh, ratio = 0.1, std = 0.01, verticeSampling=False)
-        p = sampler.sample(10000)
-        S = sdf.query(p)
-        c = normSDF(S, np.min(SU), np.max(SU))
-        plotSamples(axSurface, p,c)
-
-        # plot importance
-        importanceSampler = ImportanceSampler(mesh, 100000, 20)
-        p = importanceSampler.sample(10000)
-        S = sdf.query(p)
-        c = normSDF(S, np.min(SU), np.max(SU))
-
-        plotSamples(axImportance, p,c)
-
-        fig.patch.set_visible(False)
-
-        pyplot.axis('off')
-        pyplot.show()
-
-    def beforeAndAfterPlot(mesh,sdf):
-        fig = pyplot.figure(figsize=(10,10))
-        fig.patch.set_visible(False)
-        axBefore = createAx(111)
-        
-        pyplot.axis('off')
-        #plotCube(axBefore)
-        #plotCube(axAfter)
-
-        # plot importance
-        importanceSampler = ImportanceSampler(mesh, 100000, 20)
-        p = importanceSampler.sample(10000)
-        plotSamples(axBefore, p,'grey')
-        pyplot.savefig('before.png', dpi=300, transparent=True)
-        
-        fig = pyplot.figure(figsize=(10,10))
-        fig.patch.set_visible(False)
-        axAfter = createAx(111)
-        S = sdf.query(p)
-        c = normSDF(S)
-        plotSamples(axAfter, p,c)
-        pyplot.savefig('after.png', dpi=300, transparent=True)
-
-
-    def importanceMotivationPlot(mesh,sdf):
-
-        fig = pyplot.figure(figsize=(10,10))
-        axSurface = createAx(111)
-
-        #surface sampling
-        sampler = PointSampler(mesh, ratio = 0.0, std = 0.01, verticeSampling=False)
-        p = sampler.sample(10000)
-        c = density(p)
-        maxDensity = np.max(c)
-        c = c/maxDensity
-        plotSamples(axSurface, p,c, vmin=0)
-        #pyplot.show()
-        pyplot.savefig('surface.png', dpi=300, transparent=True)
-
-
-        #vertex sampling
-        fig = pyplot.figure(figsize=(10,10))
-        axVertex = createAx(111)
-        sampler = PointSampler(mesh, ratio = 0.0, std = 0.1, verticeSampling=True)
-        p = sampler.sample(10000)
-        c = density(p)
-        maxDensity = np.max(c)
-        c = c/maxDensity
-        plotSamples(axVertex, p,c, vmin=0)
-        #pyplot.show()
-        pyplot.savefig('vertex.png', dpi=300, transparent=True)
-
-        fig = pyplot.figure(figsize=(10,10))
-        axImportance = createAx(111)
-        
-        # importance sampling
-        importanceSampler = ImportanceSampler(mesh, 1000000, 50)
-        p = importanceSampler.sample(10000)
-        c = density(p)
-        maxDensity = np.max(c)
-        c = c/maxDensity
-        plotSamples(axImportance, p, c, vmin = 0)
-        #pyplot.show()
-        pyplot.savefig('importance.png', dpi=300, transparent=True)
-
-
-
     def main():
         import argparse
         import h5py
@@ -537,10 +546,6 @@ if __name__ == '__main__':
         #importanceSamplingComparisonPlot(mesh, sdf)
         #beforeAndAfterPlot(mesh,sdf)
         #importanceMotivationPlot(mesh,sdf)
-
-
-
-
     
     main()
 

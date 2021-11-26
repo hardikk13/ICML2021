@@ -226,6 +226,15 @@ void DenseLayer::initializeWeights(std::vector<std::vector<float>> weights) {
     }
 }
 
+void Print(Matrix& matrix) {
+    matrix.copyDeviceToHost();
+    for (int i = 0; i < matrix.size(); ++i) {
+       printf("\t %d, %f \n", i , matrix[i]);
+    }
+    std::cout << "\n\n";
+}
+
+
 Matrix& DenseLayer::forward(Matrix& A, int maxBatchSize) {
     assert(W.shape.x == A.shape.x);
 
@@ -244,7 +253,7 @@ Matrix& DenseLayer::forward(Matrix& A, int maxBatchSize) {
     checkCudaErrors(ok);
 
     Z.shape.y = A.shape.y;
-
+    // Print(Z);
     return Z;   
 }
 

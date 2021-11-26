@@ -12,3 +12,14 @@ We additionally share the weight-encoded neural implicits for the Entirety of th
   **thingi10k-weight-encoded** --> The entirety of Thingi10k represented in our weight-encoded neural implicit format. (see releases for mesh version for convenience)
 
 
+# Command for `impeller.obj` Experiment
+
+```
+python trainer.py ../data/impeller/impeller.stl --firstLayerHiddenSize=256 --numLayers=10 --showVis 1 --outputDir  ../results/impeller/ --epochs 6 --batchSize 512 --reconstructionRes 256 --learningRate 0.001 --validationRes 128 --loss l2
+```
+
+For vicis
+```
+python trainer.py ../data/vicis/vicis.stl --firstLayerHiddenSize=256 --numLayers=10 --showVis 1 --outputDir  ../results/vicis/ --epochs 6 --batchSize 8152 --reconstructionRes 256 --learningRate 0.001 --validationRes 128 --loss l2
+```
+

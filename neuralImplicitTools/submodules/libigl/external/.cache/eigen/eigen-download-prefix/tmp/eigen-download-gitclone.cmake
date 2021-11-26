@@ -4,21 +4,21 @@ endif()
 
 set(run 0)
 
-if("/mnt/school/shapeMemory/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitinfo.txt" IS_NEWER_THAN "/mnt/school/shapeMemory/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt")
+if("/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitinfo.txt" IS_NEWER_THAN "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt")
   set(run 1)
 endif()
 
 if(NOT run)
-  message(STATUS "Avoiding repeated git clone, stamp file is up to date: '/mnt/school/shapeMemory/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt'")
+  message(STATUS "Avoiding repeated git clone, stamp file is up to date: '/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt'")
   return()
 endif()
 
 execute_process(
-  COMMAND ${CMAKE_COMMAND} -E remove_directory "/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen"
+  COMMAND ${CMAKE_COMMAND} -E remove_directory "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen"
   RESULT_VARIABLE error_code
   )
 if(error_code)
-  message(FATAL_ERROR "Failed to remove directory: '/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen'")
+  message(FATAL_ERROR "Failed to remove directory: '/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen'")
 endif()
 
 set(git_options)
@@ -47,13 +47,13 @@ foreach(config IN LISTS git_config)
   list(APPEND git_clone_options --config ${config})
 endforeach()
 
-# try the clone 3 times incase there is an odd git clone issue
+# try the clone 3 times in case there is an odd git clone issue
 set(error_code 1)
 set(number_of_tries 0)
 while(error_code AND number_of_tries LESS 3)
   execute_process(
     COMMAND "/usr/bin/git" ${git_options} clone ${git_clone_options} --origin "origin" "https://github.com/eigenteam/eigen-git-mirror.git" "eigen"
-    WORKING_DIRECTORY "/mnt/school/shapeMemory/submodules/libigl/cmake/../external"
+    WORKING_DIRECTORY "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external"
     RESULT_VARIABLE error_code
     )
   math(EXPR number_of_tries "${number_of_tries} + 1")
@@ -68,7 +68,7 @@ endif()
 
 execute_process(
   COMMAND "/usr/bin/git" ${git_options} checkout 3.2.10 --
-  WORKING_DIRECTORY "/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen"
+  WORKING_DIRECTORY "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen"
   RESULT_VARIABLE error_code
   )
 if(error_code)
@@ -77,32 +77,32 @@ endif()
 
 execute_process(
   COMMAND "/usr/bin/git" ${git_options} submodule init 
-  WORKING_DIRECTORY "/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen"
+  WORKING_DIRECTORY "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen"
   RESULT_VARIABLE error_code
   )
 if(error_code)
-  message(FATAL_ERROR "Failed to init submodules in: '/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen'")
+  message(FATAL_ERROR "Failed to init submodules in: '/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen'")
 endif()
 
 execute_process(
   COMMAND "/usr/bin/git" ${git_options} submodule update --recursive --init 
-  WORKING_DIRECTORY "/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen"
+  WORKING_DIRECTORY "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen"
   RESULT_VARIABLE error_code
   )
 if(error_code)
-  message(FATAL_ERROR "Failed to update submodules in: '/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen'")
+  message(FATAL_ERROR "Failed to update submodules in: '/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen'")
 endif()
 
 # Complete success, update the script-last-run stamp file:
 #
 execute_process(
   COMMAND ${CMAKE_COMMAND} -E copy
-    "/mnt/school/shapeMemory/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitinfo.txt"
-    "/mnt/school/shapeMemory/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt"
-  WORKING_DIRECTORY "/mnt/school/shapeMemory/submodules/libigl/cmake/../external/eigen"
+    "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitinfo.txt"
+    "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt"
+  WORKING_DIRECTORY "/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/cmake/../external/eigen"
   RESULT_VARIABLE error_code
   )
 if(error_code)
-  message(FATAL_ERROR "Failed to copy script-last-run stamp file: '/mnt/school/shapeMemory/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt'")
+  message(FATAL_ERROR "Failed to copy script-last-run stamp file: '/home/hardik/dl_exp/overfit/neuralImplicitTools/submodules/libigl/external/.cache/eigen/eigen-download-prefix/src/eigen-download-stamp/eigen-download-gitclone-lastrun.txt'")
 endif()
 

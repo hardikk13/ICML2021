@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import schedules
+import yogi_opt
 
 from tensorboard.plugins.hparams import api as hp
 
@@ -13,7 +14,6 @@ tf.compat.v1.disable_eager_execution()
 
 class Config(object):
     """Holds model hyperparams and data information.
-
     The config class is used to store various hyperparameters and dataset
     information parameters. Model objects are passed a Config() object at
     instantiation.
@@ -21,7 +21,7 @@ class Config(object):
     hiddenSize = 32
     batchSize = 2048
     numLayers = 8
-    activation = 'elu'
+    activation = 'relu'
     workers = 4
     saveDir = ''
     name = 'sdfModel'
@@ -58,20 +58,35 @@ class SDFModel:
 
     inputs = tf.keras.Input(shape= (3,))
 
+    # DAM shape
+    dam_dim = [333, 442, 351, 340, 304, 139, 76, 53, 39, 36, 35]
+    if self.config.damArch:
+      hiddenSize = dam_dim[0]
+    else:
+      hiddenSize = self.config.hiddenSize
+
     x = tf.keras.layers.Dense(
-      self.config.hiddenSize,
+      hiddenSize,
       input_shape=(3,),
+      kernel_initializer=self.config.init,
       activation = self.config.activation
     )(inputs)
 
-    for _ in range(self.config.numLayers - 1):
-        x = tf.keras.layers.Dense(
-          self.config.hiddenSize,
-          activation = self.config.activation
-        )(x)
+    
+    for i in range(self.config.numLayers - 1):
+      if self.config.damArch:
+        hiddenSize = dam_dim[i+1]
+      else:
+        hiddenSize = self.config.hiddenSize
+      x = tf.keras.layers.Dense(
+        hiddenSize,
+        kernel_initializer=self.config.init,
+        activation = self.config.activation
+      )(x)
     
     outputs = tf.keras.layers.Dense(
         1,
+        kernel_initializer=self.config.init,
         activation='tanh',
     )(x)
 
@@ -101,7 +116,7 @@ class SDFModel:
     def inOut(labels,predictions):
       return 0.5*tf.math.maximum(0.0, 1 - tf.math.sign(labels) * tf.math.sign(predictions))
 
-    metrics = [mse,mae]#,mape,overshot, inOut]
+    metrics = [mse,mae,inOut]#,mape,overshot, inOut]
 
     return (metrics)
 
@@ -211,7 +226,8 @@ class SDFModel:
     with open(os.path.join(self.config.saveDir,self.config.name + '.json'), 'w') as jsonFile:
       jsonFile.write(modelJson)
     #save weights
-    self.model.save_weights(os.path.join(self.config.saveDir,self.config.name + '.h5'))
+    self.model.save_weights(os.path.join(self.config.saveDir,self.config.name + '.h5'), save_format='h5')
+    # self.model.save(os.path.join(self.config.saveDir,self.config.name + '_builtin_.h5'))
   
   def load(self, modelFolder = None):
     if modelFolder == None:
@@ -224,8 +240,19 @@ class SDFModel:
     #load weights
     self.model.load_weights(os.path.join(modelFolder,self.config.name + '.h5'))
 
+  # def gyroid(self, data):
+  #   cos(pi*data[])
+
   def predict(self, data):
+    # return max(self.model.gyroid(data), self.model.predict(data, batch_size = self.config.batchSize, verbose=1))
     return self.model.predict(data, batch_size = self.config.batchSize, verbose=1)
+
+  def gradients(self, data):
+    x_tensor = tf.convert_to_tensor(data, dtype=tf.float32)
+    with tf.GradientTape() as t:
+      t.watch(x_tensor)
+      output = self.model(x_tensor)
+    return t.gradient(output, x_tensor)
 
   def _clampLoss(self,yTrue, yPred):
     return tf.keras.losses.mean_absolute_error(
@@ -250,6 +277,9 @@ class SDFModel:
       )*surfaceWeight
     )
 
+  def _inOut(self, yTrue, yPred):
+    return 0.5*tf.math.maximum(0.0, 1 - tf.math.sign(yTrue) * tf.math.sign(yPred))
+
   def _weightedL1(self, yTrue, yPred):
     #hypothesis: we care less about things far from surface.
     return tf.reduce_mean(tf.abs(yTrue-yPred)*tf.math.exp(-50*tf.math.abs(yTrue)))
@@ -257,8 +287,10 @@ class SDFModel:
   def createLoss(self):
     if self.config.lossType ==  'l1':
       self.loss = tf.keras.losses.MeanAbsoluteError()
-    elif self.config.lossType == 'l2':
+    elif self.config.lossType == 'l2':      
       self.loss = tf.keras.losses.MeanSquaredError()
+    elif self.config.lossType == 'InOut':      
+      self.loss = self._inOut
     elif self.config.lossType == 'clamp':
       self.loss = self._clampLoss
     elif self.config.lossType == 'min':
@@ -270,6 +302,4 @@ class SDFModel:
 
   def createOpt(self):
     self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.config.learningRate)
-
-
-
+    # self.optimizer = yogi_opt.Yogi(learning_rate=self.config.learningRate)
